@@ -1,7 +1,7 @@
 ---
 title: 'Psych 254 W15 PS #1'
-author: "Mike Frank"
-date: "January 11, 2015"
+author: "Eric Smith"
+date: "January 25, 2015"
 output: html_document
 ---
 
@@ -19,13 +19,9 @@ Preliminaries
 
 I pretty much always clear the workspace and load the same basic helper functions before starting an analysis.
 
-```{r prelims}
-rm(list=ls())
-setwd("~/psych254_materials/analyses")
+```{r prelims, warning=FALSE, message=FALSE}
+#setwd("~/psych254_materials/analyses")
 source("../helper/useful.R")
-```
-
-```{r libraries}
 library(Hmisc)
 library(dplyr)
 library(tidyr)
@@ -66,7 +62,7 @@ for(number_col in number_cols) {
 
 ### Excel fixes:
 change character responses to correct numeric columns
-```{r}
+```{r,warning=FALSE}
 warning("This is not tracked in the R document")
 d_fix <- read.csv("../data/janiszewski_rep_cleaned_ES.csv")
 ```
@@ -177,19 +173,19 @@ d.tidy %>% summarise(mean(cost,na.rm=T))
 
 This is a great time to get comfortable with the `%>%` operator. In brief, `%>%` allows you to pipe data from one function to another. So if you would have written:
 
-```{r}
+```{r,eval=FALSE}
 d <- function(d, other_stuff)
 ```
   
 you can now write:
 
-```{r}
+```{r,eval=FALSE}
 d <- d %>% function(other_stufF)
 ```
 
 That doesn't seem like much, but it's cool when you can replace:
 
-```{r}
+```{r,eval=FALSE}
 d <- function1(d, other_stuff)
 d <- function2(d, lots_of_other_stuff, more_stuff)
 d <- function3(d, yet_more_stuff)
@@ -197,7 +193,7 @@ d <- function3(d, yet_more_stuff)
 
 with
 
-```{r}
+```{r,eval=FALSE}
 d <- d %>% 
   function1(other_stuff) %>%
   function2(lots_of_other_stuff, more_stuff) %>%
@@ -266,7 +262,7 @@ z.scores <- d.tidy %>%
   group_by(item) %>%
   mutate(zscore = scale(cost)[,1]) %>%
   group_by(item,condition) %>%
-  summarize(z = mean(zscore,na.rm=T))
+  summarise(z = mean(zscore,na.rm=T))
 ```
 
 OK, now here comes the end: we're going to plot the differences and see if anything happened. First the percent change:
