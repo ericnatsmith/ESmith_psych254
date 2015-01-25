@@ -21,7 +21,14 @@ I pretty much always clear the workspace and load the same basic helper function
 
 ```{r prelims}
 rm(list=ls())
+setwd("~/psych254_materials/analyses")
 source("../helper/useful.R")
+```
+
+```{r libraries}
+library(Hmisc)
+library(dplyr)
+library(tidyr)
 ```
 
 Note that I'm using a "relative" path (the "../helper") rather than an absolute path (e.g. "/Users/mcfrank/code/projects/etc..."). The relative path means that someone else can run your code by changing to the right directory, while the absolute path will force someone else to make trivial changes every time they want to run it.
@@ -39,9 +46,32 @@ Fine, right? Why can't we go forward with the analysis?
 
 HINT: try computing some summary statistics for the different items. Also, are there any participants that did the task more than once?
 
-Fix the data file so that it looks reasonable.
+```{r}
+# str(d) - everything is factors, and not numbers
+```
 
+First let's identify which should be number rows and which are not.
 
+Stop that, and let's just clean by data type.
+```{r}
+number_cols <- c("Reward","MaxAssignments","AssignmentDurationInSeconds","AutoApprovalDelayInSeconds","NumberOfSimilarHITs","WorkTimeInSeconds","Answer.dog_cost","Answer.plasma_cost","Answer.sushi_cost")
+
+for(number_col in number_cols) {
+  if(!is.numeric(d[[number_col]])){
+    print(paste0(number_col," is not numeric"))
+  }
+}
+
+```
+
+### Excel fixes:
+change character responses to correct numeric columns
+```{r}
+warning("This is not tracked in the R document")
+d_fix <- read.csv("../data/janiszewski_rep_cleaned_ES.csv")
+```
+
+We could also delete unnecesary rows, but we'll do this below.
 
 Part 2: Making these data tidy
 ------------------------------
@@ -58,10 +88,19 @@ To make this data tidy, we'll do some cleanup. First, remove the columns you don
 
 HINT: `?select` and the examples of helper functions will help you be efficient.
 
-```{r select}
-d.tidy <- select(...)
-```
 
+## Set up things ahead of time...
+```{r select}
+unique_column_count <- d %>% 
+  summarise_each(funs(ul = length(unique(.)))) # how many unique values
+unique_columns <- names(unique_column_count)[unique_column_count != 1] # get only columns with > 1 unique value
+
+delete_cols <- c("NumberOfSimilarHITs","AssignmentId","AcceptTime","SubmitTime","AutoApprovalTime","WorkTimeInSeconds","HITId") # columns that seem unnecesary
+
+d.tidy <- d %>% 
+  select(one_of(c(unique_columns))) %>% # select only columns with information
+  select(-one_of(c(delete_cols))) # delete other cols that seem unneccesary 
+```
 
 Try renaming some variables using `rename`. A good naming scheme is:
 
@@ -72,23 +111,35 @@ Try renaming some variables using `rename`. A good naming scheme is:
 Try using the `%>%` operator as well. So you will be "piping" `d %>% rename(...)`.
 
 ```{r rename}
-d.tidy <- ...
+d.tidy <- d.tidy %>% # modified from below for consistent names
+  rename(workerid = WorkerId,
+         condition = Input.condition,
+         plasma_anchor = Input.price1,
+         dog_anchor = Input.price2,
+         sushi_anchor = Input.price3,
+         dog_cost = Answer.dog_cost,
+         plasma_cost = Answer.plasma_cost, 
+         sushi_cost = Answer.sushi_cost)
 ```
-
 
 OK, now for the tricky part. Use the verb *gather* to turn this into a *tidy* data frame.
 
 HINT: look for online examples!
 
 ```{r gather}
-d.tidy <- ...
+d.tidy <- d.tidy %>%
+  gather(name, cost, 
+         dog_anchor, plasma_anchor, sushi_anchor, 
+         dog_cost, plasma_cost, sushi_cost)
 ```
 
 
 Bonus problem: *spread* these data back into a wide format data frame.
 
 ```{r spread}
-d.wide <- ...
+d.wide <- d.tidy %>%
+  separate(name, c("item", "type"), sep = "_") %>% # This is super clever
+  spread(type, cost)
 ```
 
 
@@ -99,12 +150,21 @@ Try also using the dplyr `distinct` function to remove the duplicate participant
 
 ```{r}
 d.raw <- read.csv("../data/janiszewski_rep_exercise.csv")
-d.unique.subs <- ...
+d.unique.subs <- d.raw %>%
+  distinct(WorkerId)
 ```
 
 As we said in class, a good thing to do is always to check histograms of the response variable. Do that now, using either regular base graphics or ggplot. What can you conclude? 
 
 ```{r}
+library(ggplot2)
+ggplot(d.unique.subs, aes(x=Answer.sushi_cost, fill=Input.condition) ) +
+  geom_histogram() + facet_grid(Input.condition~.)
+ggplot(d.unique.subs, aes(x=Answer.plasma_cost, fill=Input.condition) ) +
+  geom_histogram() + facet_grid(Input.condition~.)
+ggplot(d.unique.subs, aes(x=Answer.dog_cost, fill=Input.condition) ) +
+  geom_histogram() + facet_grid(Input.condition~.)
+
 ```
 
 OK, now we turn to the actual data anlysis. We'll be using dplyr verbs to `filter`, `group`,`mutate`, and `summarise` the data.
@@ -112,7 +172,7 @@ OK, now we turn to the actual data anlysis. We'll be using dplyr verbs to `filte
 Start by using `summarise` on `d.tidy` to compute the mean bet across all participants. Note that this is simply taking the grand mean. Ultimately, we would like to compute the mean for different conditions and items, but this will come later. Right now we're just learning the syntax of `summarise`.
 
 ```{r}
-...
+d.tidy %>% summarise(mean(cost,na.rm=T))
 ```
 
 This is a great time to get comfortable with the `%>%` operator. In brief, `%>%` allows you to pipe data from one function to another. So if you would have written:
@@ -149,7 +209,9 @@ In other words, you get to make a clean list of the things you want to do and ch
 Let's use that capacity to combine `summarise` with `group_by`, which allows us to break up our summary into groups. Try grouping by item and condition and taking means using `summarise`, chaining these two verbs with `%>%`.
 
 ```{r}
-...
+d.wide %>% 
+  group_by(item,condition) %>%
+  summarise(mean(cost,na.rm=T))
 ```
 
 OK, it's looking like there are maybe some differences between conditions, but how are we going to plot these? They are fundamentally different magnitudes from one another. 
@@ -187,8 +249,10 @@ To do the first, use the `mutate` verb to add a percent change column, then comu
 
 ```{r}
 pcts <- d.tidy %>%
-  mutate(pct_change = ... ) %>%
-  ...
+  mutate(pct_change = cost/anchor ) %>%
+  group_by(item,condition) %>%
+  summarise(pct = mean(pct_change,na.rm=T))
+
 ```
 
 To do the second, you will need to `group` first by item, compute z-scores with respect to items, then further group by condition.
@@ -198,7 +262,11 @@ HINT: `scale(x)` returns a complicated data structure that doesn't play nicely w
 HINT: by default, `group_by` undoes any previous groupings. If you want to add new grouping variables *on top* of pre-existing ones, specify `add = TRUE`, e.g., `d %>% group_by(var1) %>% group_by(var2, add = TRUE)`.
 
 ```{r}
-z.scores <- d.tidy %>% ...
+z.scores <- d.tidy %>% 
+  group_by(item) %>%
+  mutate(zscore = scale(cost)[,1]) %>%
+  group_by(item,condition) %>%
+  summarize(z = mean(zscore,na.rm=T))
 ```
 
 OK, now here comes the end: we're going to plot the differences and see if anything happened. First the percent change:
