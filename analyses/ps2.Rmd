@@ -28,20 +28,20 @@ Now we're going to use qplot. qplot is the easy interface, meant to replace plot
 
 We're going to be using the diamonds dataset. This is a set of measurements of diamonds, along with their price etc.
 
-```{r, eval=FALSE}
+```{r}
 head(diamonds)
 qplot(diamonds$carat, diamonds$price)
 ```
 
 Scatter plots are trivial, and easy to add features to. Modify this plot so that it uses the dataframe rather than working from variables in the general namespace (good to get away from retyping `diamonds$` every time you reference a variable). 
 
-```{r, eval=FALSE}
+```{r}
 qplot(carat,price,data=diamonds)
 ```
 
 Try adding clarity and cut, using shape and color as your visual variables. 
 
-```{r, eval=FALSE}
+```{r}
 ggplot(diamonds, aes(x=carat, y=price, color=clarity)) +
   theme_classic()+
   geom_point() +
