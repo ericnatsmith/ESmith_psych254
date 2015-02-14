@@ -1,4 +1,4 @@
-<style type="text/css"> p.eric {color: blue} </style>
+<style type="text/css"> p.eric {color: blue;} </style>
 
 ---
 title: 'Psych 254 W15 PS #2'
