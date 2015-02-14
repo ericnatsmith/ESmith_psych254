@@ -1,0 +1,358 @@
+<style> div.eric {color: blue} </style>
+
+---
+title: 'Psych 254 W15 PS #2'
+author: "Eric Smith"
+date: "February 14, 2015"
+output: html_document
+---
+
+This is problem set #2, in which we hope you will practice the visualization package ggplot2, as well as hone your knowledge of the packages tidyr and dplyr. 
+
+Part 1: Basic intro to ggplot
+=============================
+
+Part 1A: Exploring ggplot2 using qplot
+--------------------------------------
+
+Note, that this example is from the_grammar.R on http://had.co.nz/ggplot2 
+I've adapted this for psych 254 purposes
+
+First install and load the package.
+
+```{r}
+library(ggplot2)
+```
+
+Now we're going to use qplot. qplot is the easy interface, meant to replace plot. You can give it simple `qplot(x,y)` examples, or slightly more complex examples like `qplot(x, y, col=grp, data=d)`. 
+
+We're going to be using the diamonds dataset. This is a set of measurements of diamonds, along with their price etc.
+
+```{r}
+head(diamonds)
+qplot(diamonds$carat, diamonds$price)
+```
+
+Scatter plots are trivial, and easy to add features to. Modify this plot so that it uses the dataframe rather than working from variables in the general namespace (good to get away from retyping `diamonds$` every time you reference a variable). 
+
+```{r}
+qplot(carat,price,data=diamonds)
+```
+
+Try adding clarity and cut, using shape and color as your visual variables. 
+
+```{r}
+ggplot(diamonds, aes(x=carat, y=price, color=clarity)) +
+  theme_classic()+
+  geom_point() +
+  facet_grid(cut~.)
+```
+
+One of the primary benefits of `ggplot2` is the use of facets - also known as small multiples in the Tufte vocabulary. That last plot was probably hard to read. Facets could make it better. Try adding a `facets = x ~ y` argument. `x ~ y` means row facets are by x, column facets by y. 
+
+```{r}
+ggplot(diamonds, aes(x=carat, y=price, color=clarity)) +
+  theme_classic()+
+  geom_point() +
+  facet_grid(cut~clarity)
+```
+
+But facets can also get overwhelming. Try to strike a good balance between color, shape, and faceting.
+
+HINT: `facets = . ~ x` puts x on the columns, but `facets = ~ x` (no dot) *wraps* the facets. These are underlying calls to different functions, `facet_wrap` (no dot) and `facet_grid` (two arguments). 
+
+```{r}
+ggplot(diamonds, aes(x=carat, y=price, color=clarity)) +
+  theme_classic()+
+  geom_point() +
+  facet_wrap(~cut)
+```
+
+The basic unit of a ggplot plot is a "geom" - a mapping between data (via an "aesthetic") and a particular geometric configuration on coordinate axes. 
+
+Let's try some other geoms and manipulate their parameters. First, try a histogram (`geom="hist"`). 
+
+```{r}
+ggplot(diamonds, aes(x=price)) +
+  theme_classic()+
+  geom_histogram() 
+```
+
+Now facet your histogram by clarity and cut. 
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(diamonds, aes(x=price)) +
+  theme_classic() +
+  geom_histogram() +
+  facet_grid(cut ~ clarity)
+```
+
+I like a slightly cleaner look to my plots. Luckily, ggplot allows you to add "themes" to your plots. Try doing the same plot but adding `+ theme_bw()` or `+ theme_classic()`. Different themes work better for different applications, in my experience. 
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(diamonds, aes(x=price)) +
+  theme_classic() +
+  geom_histogram() +
+  facet_grid(cut ~ clarity)
+```
+
+Part 1B: Exploring ggplot2 using ggplot
+---------------------------------------
+
+`ggplot` is just a way of building `qplot` calls up more systematically. It's
+sometimes easier to use and sometimes a bit more complicated. What I want to show off here is the functionality of being able to build up complex plots with multiple elements. You can actually do this using qplot pretty easily, but there are a few things that are hard to do. 
+
+`ggplot` is the basic call, where you specify A) a dataframe and B) an aesthetic mapping from variables in the plot space to variables in the dataset. 
+
+```{r}
+d <- ggplot(diamonds, aes(x=carat, y=price)) # first you set the aesthetic and dataset
+d + geom_point() # then you add geoms
+d + geom_point(aes(colour = carat)) # and you can keep doing this to add layers to the plot
+```
+
+Try writing this as a single set of additions (e.g. one line of R code, though you can put in linebreaks). This is the most common workflow for me. 
+
+
+```{r}
+d <- ggplot(diamonds, aes(x=carat, y=price)) + # first you set the aesthetic and dataset
+  geom_point() + # then you add geoms
+  geom_point(aes(colour = carat)) # and you can keep doing this to add layers to the plot
+d
+```
+
+
+You can also set the aesthetic separately for each geom, and make some great plots this way. Though this can get complicated. Try using `ggplot` to build a histogram of prices. 
+
+```{r}
+d <- ggplot(diamonds ) + # first you set the aesthetic and dataset
+  theme_classic() + 
+  geom_histogram(aes(x=price))
+d
+```
+
+Part 2: Diving into real data: Sklar et al. (2012)
+==================================================
+
+Sklar et al. (2012) claims evidence for unconscious arithmetic processing. We're going to do a reanalysis of their Experiment 6, which is the primary piece of evidence for that claim. The data are generously contributed by Asael Sklar. 
+
+First let's set up a few preliminaries. 
+
+```{r}
+library(tidyr)
+library(dplyr)
+
+sem <- function(x) {sd(x) / sqrt(length(x))}
+ci95 <- function(x) {sem(x) * 1.96}
+```
+
+Data Prep
+---------
+
+First read in two data files and subject info. A and B refer to different trial order counterbalances. 
+
+```{r, warning=FALSE}
+setwd("~/ESmith_psych254/analyses")
+subinfo <- read.csv("../data/sklar_expt6_subinfo_corrected.csv")
+d.a <- read.csv("../data/sklar_expt6a_corrected.csv")
+d.b <- read.csv("../data/sklar_expt6b_corrected.csv")
+```
+
+Gather these datasets into long form and get rid of the Xs in the headers.
+
+```{r}
+d.a <- d.a %>%
+  gather(id,time,
+         X1:X21)
+d.b <- d.b %>%
+  gather(id,time,
+         X22:X42)
+```
+
+Bind these together. Check out `bind_rows`.
+
+```{r}
+d <- bind_rows(d.a,d.b)
+```
+
+Merge these with subject info. You will need to look into merge and its relatives, `left_join` and `right_join`. Call this dataframe `d`, by convention. 
+
+```{r}
+d$id <- gsub("X","",d$id) # get rid of X's to merge
+d <- merge(subinfo,d,by.x="subid","id") # join is much faster- look into this
+```
+
+Clean up the factor structure.
+
+```{r}
+d$presentation.time <- factor(d$presentation.time)
+d$operand <- factor(d$operand)
+levels(d$operand) <- c("addition","subtraction")
+```
+
+Data Analysis Preliminaries
+---------------------------
+
+Examine the basic properties of the dataset. First, take a histogram.
+
+```{r}
+hist(d$time)
+hist(d$time[d$time > 400 & d$time < 1000])
+```
+
+Challenge question: what is the sample rate of the input device they are using to gather RTs?
+
+```{r}
+stem(d$time[d$time >600 & d$time <800])
+
+663-627
+699-663
+#etc.
+```
+<p><div class=eric>Looks like the refresh frame rate is about 36 milliseconds.</div></p>
+
+Sklar et al. did two manipulation checks. Subjective - asking participants whether they saw the primes - and objective - asking them to report the parity of the primes (even or odd) to find out if they could actually read the primes when they tried. Examine both the unconscious and conscious manipulation checks (this information is stored in subinfo). What do you see? Are they related to one another?
+
+```{r} 
+# First let's check out the relationship between the subjective and objective primes
+ggplot(subinfo,aes(x=subjective.test,y=objective.test)) +
+  geom_point() +
+  theme_classic()
+```
+
+<div class=eric> Visually, it certainly looks like those that reported seeing the problems were much better at the objective tests, were those that did not see it were no better than chance. But let's test this.</div>
+
+```{r}
+summary(lm(objective.test ~ as.factor(subjective.test), data=subinfo))
+```
+
+<p><div class=eric>We verify that objective measures of parity are better when participants report seeing the primes.</div></p>
+
+OK, let's turn back to the measure and implement Sklar et al.'s exclusion criterion. You need to have said you couldn't see (subjective test) and also be not significantly above chance on the objective test (< .6 correct). Call your new data frame `ds`.
+
+```{r}
+ds <- d %>%
+  filter(subjective.test == 0 &
+         objective.test < .6) 
+```
+
+<div class=eric>It looks like only 17 out of the 42 participants are included in data analysis. That's pretty fishy right there...</div>
+
+Sklar et al.'s analysis
+-----------------------
+
+Sklar et al. show a plot of a "facilitation effect" - the time to respond to incongruent primes minus the time to respond to congruent primes. They then show plot this difference score for the subtraction condition and for the two presentation times they tested. Try to reproduce this analysis.
+
+HINT: first take averages within subjects, then compute your error bars across participants, using the `sem` function (defined above). 
+
+```{r}
+# first we aggregate by subject by taking their mean scores from incongruent and congruent
+p1 <- ds %>%
+  group_by(subid,presentation.time,congruent,operand) %>%
+  summarize(time = mean(time,na.rm=T)) %>%
+  spread(congruent,time) %>%
+  mutate(diff = no - yes) %>%
+  group_by(presentation.time,operand) %>%
+  summarize(mean = mean(diff),
+            sem = sem(diff),
+            ci = ci95(diff))
+```
+
+Now plot this summary, giving more or less the bar plot that Sklar et al. gave (though I would keep operation as a variable here. Make sure you get some error bars on there (e.g. `geom_errorbar` or `geom_linerange`). 
+
+```{r}
+ggplot(p1, aes(x=presentation.time, y=mean)) +
+  theme_classic() +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymax = mean + sem, ymin=mean - sem), width=1) +
+  facet_grid(.~operand)
+```
+
+What do you see here? How close is it to what Sklar et al. report? Do the error bars match? How do you interpret these data? 
+
+<p><div class=eric>The error bars do not seem to match at all. As discussed in class, the error bars reported are actualy 1/2 the standard error.</div></p>
+
+Challenge problem: verify Sklar et al.'s claim about the relationship between RT and the objective manipulation check.
+
+```{r}
+p2 <- ds %>%
+  filter(operand == "subtraction") %>%
+  group_by(subid,presentation.time,congruent) %>%
+  summarize(time = mean(time,na.rm=T)) %>%
+  spread(congruent,time) %>%
+  mutate(diff = no - yes)
+
+p2b <- merge(subinfo,p2)
+summary(lm(diff ~ I(objective.test-.5),data=p2b)) # 
+```
+<p><div class=eric>We verify that the there is a facilitation when the objective test measure is at chance, t(15)=3.91, p=.001, and there is a non-significant effect of the objective.test, t(15)=1.47, p=.16 .</div></p>
+
+Your own analysis
+-----------------
+
+Show us what you would do with these data, operating from first principles. What's the fairest plot showing a test of Sklar et al.'s original hypothesis that people can do arithmetic "non-consciously"?
+
+<div class=eric>Without limiting the data at all, or taking only the subtraction, let's do the same plots as before.</div>
+```{r}
+p3 <- d %>%
+  group_by(subid,presentation.time,congruent,operand) %>%
+  summarize(time = mean(time,na.rm=T)) %>%
+  spread(congruent,time) %>%
+  mutate(diff = no - yes) %>%
+  group_by(presentation.time,operand) %>%
+  summarize(mean = mean(diff),
+            sem = sem(diff),
+            ci = ci95(diff))
+ggplot(p3, aes(x=presentation.time, y=mean)) +
+  theme_classic() +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymax = mean + sem, ymin=mean - sem), width=1) +
+  facet_grid(.~operand)
+```
+
+<div class=eric>Now it does seem reasonable to limit the data if people report seeing the numbers. That would suggest that this is quite conscious. However, it is odd for the original paper to limit participants who perform better than chance on telling whether the resulting number is even or odd.  After all, if they are able to facilitate their solving the math problem, you'd think the same processes would allow them to determine parity.</div>
+
+```{r}
+p4 <- d %>%
+  filter(subjective.test == 0) %>%
+  group_by(subid,presentation.time,congruent,operand) %>%
+  summarize(time = mean(time,na.rm=T)) %>%
+  spread(congruent,time) %>%
+  mutate(diff = no - yes) %>%
+  group_by(presentation.time,operand) %>%
+  summarize(mean = mean(diff),
+            sem = sem(diff),
+            ci = ci95(diff))
+ggplot(p4, aes(x=presentation.time, y=mean)) +
+  theme_classic() +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymax = mean + sem, ymin=mean - sem), width=1) +
+  facet_grid(.~operand)
+```
+
+Challenge problem: Do you find any statistical support for Sklar et al.'s findings?
+
+```{r}
+p4b <- d %>%
+  filter(subjective.test == 0 & operand == "subtraction") %>%
+  group_by(subid,presentation.time,congruent,operand) %>%
+  summarize(time = mean(time,na.rm=T)) %>%
+  spread(congruent,time) %>%
+  mutate(diff = no - yes) 
+
+tt <- t.test(p4b$diff); tt
+```
+
+<div class=eric>If we use the same sort of statistics as in the paper, we do find not limiting the data on objective measures of parity still shows a significant facilitation effect for subtraction problems.  However, if we did this analysis using an lmer model, with a random intercept and slope for participant, we do not find the same effect.</div>
+
+```{r}
+library(lme4)
+library(lmerTest)
+ps2 <- d %>% filter(subjective.test == 0)
+summary(lmer(time ~ operand + congruent + (operand+congruent|subid), data=ps2))
+```
+<div class=eric>On first pass, it looks like subtraction is even quicker than addition, which does not support the claim that subtraction was harder. So lets take that term out of the equation.</div>
+```{r}
+summary(lmer(time ~ congruent + (congruent|subid), data=ps2)) 
+pt(1.3,15,lower.tail=F)*2
+```
+<div class=eric>So we leave that out of our final summary, and find that there is no significant facilitation in congruent trials compared to incongruent trials, t=1.34, p=.18.</div>
